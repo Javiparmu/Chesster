@@ -1,6 +1,7 @@
 import "./styles/index.scss";
 import { pieces } from './pieces.js'
 import { chessAI } from './chessAI.js'
+import { minimaxAI } from "./minimaxAI.js"
 import movesound from './sounds/movesound.mp3'
 import checksound from './sounds/checksound.mp3'
 import capturesound from './sounds/capturesound.mp3'
@@ -224,6 +225,7 @@ const placePiece = (cell, cellType) => {
     cell.appendChild(piece)
 }
 
+// Timers
 function startTimer(duration, display, color) {
     let timer = Date.now(), minutes, seconds
 
@@ -281,6 +283,7 @@ function stopTimer(timerIntervalId) {
     clearInterval(timerIntervalId)
 }
 
+// Piece click event
 const handlePieceClick = (e) => {
     if (isPieceSelected) {
         if (selectedPiece.getAttribute('piece-color') === e.target.getAttribute('piece-color')) {
@@ -292,6 +295,7 @@ const handlePieceClick = (e) => {
                 }
             }
         } else {
+            // Capture piece
             const nextMove = [Number(e.target.parentElement.getAttribute('data-row')), Number(e.target.parentElement.getAttribute('data-col'))]
             const row = Number(selectedPiece.parentElement.getAttribute('data-row'))
             const col = Number(selectedPiece.parentElement.getAttribute('data-col'))
@@ -305,7 +309,7 @@ const handlePieceClick = (e) => {
                 const piecePos = [Number(row), Number(col)]
                 boardToCheck[nextMove[0]][nextMove[1]] = boardToCheck[piecePos[0]][piecePos[1]]
                 boardToCheck[piecePos[0]][piecePos[1]] = ' '
-                if(checkIfCheck(nextMove, boardToCheck, 'white')) {
+                if(checkIfCheck(boardToCheck, 'white')) {
                     movesToRemove.push(nextMove)
                 }
             }
@@ -339,6 +343,7 @@ const handlePieceClick = (e) => {
 
                 checkIfPromotion(e.target.parentElement, pieceMoved.parentElement)
 
+                // Start and stop timers
                 if (turn === 'white') {
                     stopTimer(whiteTimerIntervalId)
                     if (mode === 'PvsP') startTimer(blackTime, blacksDisplay, 'black')
@@ -355,8 +360,10 @@ const handlePieceClick = (e) => {
                 actualFEN = createFEN()
                 actualBoard = getActualBoard()
                 const nextMovePos = [nextCell.getAttribute('data-row'), nextCell.getAttribute('data-col')]
-                isCheck = checkIfCheck(nextMovePos, actualBoard, 'black')
+                isCheck = checkIfCheck(actualBoard, 'black')
                 if (isCheck) checkSound.play()
+
+                // AI moves
                 if (mode === 'PvsAI' && turn === 'black') {
                     let bestMove = null
                     let pieceToMove = null
@@ -426,7 +433,7 @@ const handlePieceClick = (e) => {
                         lastPieceMovedByOpponent = dataArray[2]
                         actualFEN = createFEN()
                         const nextMoveAI = [nextMoveAICell.getAttribute('data-row'), nextMoveAICell.getAttribute('data-col')]
-                        isCheck = checkIfCheck(nextMoveAI, actualBoard, 'white')
+                        isCheck = checkIfCheck(actualBoard, 'white')
                         if (isCheck) checkSound.play()
                     }
                     else {
@@ -436,6 +443,7 @@ const handlePieceClick = (e) => {
                         let openingMoves = null
                         let actualFEN = chessAI.getFenFromBoard(boardToCheck, halfClock, whitesCanCastleRight, whitesCanCastleLeft, blacksCanCastleRight, blacksCanCastleLeft)
 
+                        // Fetch for opening moves
                         const bestMoveData = () => {
                             return new Promise((resolve, reject) => {
                                 fetch(`https://explorer.lichess.ovh/masters?fen=${actualFEN}`, {method: 'GET'})
@@ -478,7 +486,8 @@ const handlePieceClick = (e) => {
                         }
                         fetchOpeningMoves().then(data => {
                             if (data === null) {
-                                data = chessAI.minimaxRoot(3, actualFEN, true, isEndGame)
+                                // Check move from algorithm if no opening moves
+                                data = minimaxAI.minimaxRoot(3, actualFEN, true, isEndGame)
                                 if (data === null) {
                                     if (!isCheck) {
                                         setTimeout(() => {
@@ -550,8 +559,7 @@ const handlePieceClick = (e) => {
                             turn = turn === 'white' ? 'black' : 'white'
                             lastPieceMovedByOpponent = dataArray[2]
                             actualFEN = createFEN()
-                            const nextMovePos = [nextCell.getAttribute('data-row'), nextCell.getAttribute('data-col')]
-                            isCheck = checkIfCheck(nextMovePos, actualBoard, 'white')
+                            isCheck = checkIfCheck(actualBoard, 'white')
                             if (isCheck) checkSound.play()
                         })
                     }
@@ -576,6 +584,7 @@ const handlePieceClick = (e) => {
     const type = cell.getAttribute('data-type')
     const color = type === type.toUpperCase() ? 'white' : 'black'
 
+    // Highlight possible moves if it's your turn 
     if (color === turn) {
         const actualBoard = getActualBoard()
         let pieceThatCheckedPos = []
@@ -590,7 +599,7 @@ const handlePieceClick = (e) => {
             const piecePos = [Number(row), Number(col)]
             boardToCheck[nextMove[0]][nextMove[1]] = boardToCheck[piecePos[0]][piecePos[1]]
             boardToCheck[piecePos[0]][piecePos[1]] = ' '
-            if(checkIfCheck(nextMove, boardToCheck, 'white')) {
+            if(checkIfCheck(boardToCheck, 'white')) {
                 movesToRemove.push(nextMove)
             }
         }
@@ -613,6 +622,7 @@ const handlePieceClick = (e) => {
     else possibleMoves = []
 }
 
+// Square click event
 const handleSquareClick = (e) => {
     moveSound.play()
     isPieceSelected = false
@@ -705,9 +715,10 @@ const handleSquareClick = (e) => {
     actualFEN = createFEN()
     actualBoard = getActualBoard()
     const nextMovePos = [nextMoveCell.getAttribute('data-row'), nextMoveCell.getAttribute('data-col')]
-    isCheck = checkIfCheck(nextMovePos, actualBoard, 'black')
+    isCheck = checkIfCheck(actualBoard, 'black')
     if (isCheck) checkSound.play()
 
+    // AI moves
     if (mode === 'PvsAI' && turn === 'black') {
         let bestMove = null
         let pieceToMove = null
@@ -775,8 +786,7 @@ const handleSquareClick = (e) => {
             turn = turn === 'white' ? 'black' : 'white'
             lastPieceMovedByOpponent = dataArray[2]
             actualFEN = createFEN()
-            const nextMoveAI = [nextMoveAICell.getAttribute('data-row'), nextMoveAICell.getAttribute('data-col')]
-            isCheck = checkIfCheck(nextMoveAI, actualBoard, 'white')
+            isCheck = checkIfCheck(actualBoard, 'white')
             if (isCheck) checkSound.play()
         }
         else {
@@ -786,6 +796,7 @@ const handleSquareClick = (e) => {
             let openingMoves = null
             let actualFEN = chessAI.getFenFromBoard(boardToCheck,  halfClock, whitesCanCastleRight, whitesCanCastleLeft, blacksCanCastleRight, blacksCanCastleLeft)
 
+            // Fetch for opening moves
             const bestMoveData = () => {
                 return new Promise((resolve, reject) => {
                     fetch(`https://explorer.lichess.ovh/masters?fen=${actualFEN}`, {method: 'GET'})
@@ -828,8 +839,7 @@ const handleSquareClick = (e) => {
             }
             fetchOpeningMoves().then(data => {
                 if (data === null) {
-                    // data = chessAI.selectMoveFromBetterAI(2, actualFEN, false)
-                    data = chessAI.minimaxRoot(3, actualFEN, true, isEndGame)
+                    data = minimaxAI.minimaxRoot(3, actualFEN, true, isEndGame)
                     if (data === null) {
                         if (!isCheck) {
                             setTimeout(() => {
@@ -904,7 +914,7 @@ const handleSquareClick = (e) => {
                 lastPieceMovedByOpponent = dataArray[2]
                 actualFEN = createFEN()
                 const nextMoveAI = [nextMoveAICell.getAttribute('data-row'), nextMoveAICell.getAttribute('data-col')]
-                isCheck = checkIfCheck(nextMoveAI, actualBoard, 'white')
+                isCheck = checkIfCheck(actualBoard, 'white')
                 if (isCheck) checkSound.play()
             })
         }
@@ -1047,72 +1057,7 @@ const isValidMove = (pieceToMovePos, nextMove, board) => {
     else return false
 }
 
-const getPathThatChecked = (startRow, startCol, kingRow, kingCol) => {
-    let path = []
-
-    if (startRow === kingRow) {
-        if (startCol > kingCol) {
-            for (let i = startCol; i >= 0; i--) {
-                path.push([startRow, i])
-            }
-        }
-        else {
-            for (let i = startCol; i < 8; i++) {
-                path.push([startRow, i])
-            }
-        }
-    }
-    else if (startCol === kingCol) {
-        if (startRow > kingRow) {
-            for (let i = startRow; i >= 0; i--) {
-                path.push([i, startCol])
-            }
-        }
-        else {
-            for (let i = startRow; i < 8; i++) {
-                path.push([i, startCol])
-            }
-        }
-    }
-    else if (startRow > kingRow && startCol > kingCol) {
-        let row = startRow
-        let col = startCol
-        while (row >= 0 && col >= 0) {
-            path.push([row, col])
-            row--
-            col--
-        }
-    }
-    else if (startRow > kingRow && startCol < kingCol) {
-        let row = startRow
-        let col = startCol
-        while (row >= 0 && col < 8) {
-            path.push([row, col])
-            row--
-            col++
-        }
-    }
-    else if (startRow < kingRow && startCol > kingCol) {
-        let row = startRow
-        let col = startCol
-        while (row < 8 && col >= 0) {
-            path.push([row, col])
-            row++
-            col--
-        }
-    }
-    else if (startRow < kingRow && startCol < kingCol) {
-        let row = startRow
-        let col = startCol
-        while (row < 8 && col < 8) {
-            path.push([row, col])
-            row++
-            col++
-        }
-    }
-    return path
-}
-
+// Mode selector
 const createModeSelector = () => {
     const modeSelector = document.getElementsByClassName('mode-selector')[0]
     if (modeSelector) return modeSelector
@@ -1143,6 +1088,7 @@ const createModeSelector = () => {
     return modeSelect
 }
 
+// Difficulty selector
 const createDifficultySelector = () => {
     const diffSelector = document.getElementsByClassName('difficulty-selector')[0]
     if (diffSelector) return diffSelector
@@ -1173,6 +1119,7 @@ const createDifficultySelector = () => {
     return diffSelect
 }
 
+// Place rook when castle
 export const checkIfCastleAndPlaceRook = (nextMove, pieceToMovePos, board) => {
     const pieceToMoveType = board[Number(pieceToMovePos[0])][Number(pieceToMovePos[1])]
     const nextCellRow = Number(nextMove[0])
@@ -1227,6 +1174,7 @@ export const checkIfCastleAndPlaceRook = (nextMove, pieceToMovePos, board) => {
     }
 }
 
+// Check if pawn can capture
 const checkIfPawnCapture = (pos, board) => {
     const row = Number(pos[0])
     const col = Number(pos[1])
@@ -1313,7 +1261,7 @@ const checkIfPawnCaptureEnPassant = (nextMoveCell) => {
     }
 }
 
-
+// Add double move pawn if possible
 const checkIfPawnsInitialMove = (pos, board) => {
     if (board[pos[0]][pos[1]].toUpperCase() === 'P') {
         const row = pos[0]
@@ -1340,6 +1288,7 @@ const checkIfPawnsInitialMove = (pos, board) => {
     else return false
 }
 
+// Queen promotion
 const checkIfPromotion = (nextMoveCell, lastCell) => {
     const squareToCheck = isCapture ? lastCell : nextMoveCell.cloneNode(true)
     const targetSquare = isCapture ? lastCell : nextMoveCell
@@ -1366,7 +1315,7 @@ const checkIfPromotion = (nextMoveCell, lastCell) => {
     }
 }
 
-export const checkIfCheck = (lastPieceMovedPos, board, colorToCheck) => {
+export const checkIfCheck = (board, colorToCheck) => {
     let possibleOppositeColorMoves = []
     if (colorToCheck === 'white') {
         possibleOppositeColorMoves = getOneSidePossibleMoves('black', board, false)
@@ -1441,7 +1390,7 @@ export const getOneSidePossibleMoves = (color, board, checkForCheck) => {
                     const piecePos = [Number(row), Number(col)]
                     boardToCheck[nextMove[0]][nextMove[1]] = boardToCheck[piecePos[0]][piecePos[1]]
                     boardToCheck[piecePos[0]][piecePos[1]] = ' '
-                    if(checkIfCheck(nextMove, boardToCheck, color)) {
+                    if(checkIfCheck(boardToCheck, color)) {
                         movesToRemove.push(nextMove)
                     }
                 }

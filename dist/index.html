@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chesster</title>
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div class="main">
+        <header class="primary-header flex">
+            <div>
+                <div class="logo"></div>
+            </div>
+            <button class="mobile-nav-toggle" aria-controls="primary-navigation" aria-expanded="false"><span class="sr-only">Menu</span></button>
+            <nav>
+                <ul id="primary-navigation" data-visible="false" class="primary-navigation flex">
+                    <li><a href="index.html">HOME</a></li>
+                    <li><a href="#">ABOUT</a></li>
+                    <li><a href="#">CONTACT</a></li>
+                </ul>
+            </nav>
+        </header>
+        <div class="game-container">
+            <div class="settings">
+                <div class="mode"></div>
+                <div class="difficulty"></div>
+            </div>
+            <div>
+                <div class="mobile-timer top">5:00</div>
+                <div class="grid-container"></div>
+                <div class="mobile-timer bottom">5:00</div>
+            </div>
+        </div>
+        <div class="chess-right">
+            <div class="button-container">
+                <button id="play-button">Play again</button>
+            </div>
+            <div class="timers">
+                <div class="timer"><span class="white-timer-text">5:00</span></div>
+                <div id="timer-line"></div>
+                <div class="timer"><span class="black-timer-text">5:00</span></div>
+            </div>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
