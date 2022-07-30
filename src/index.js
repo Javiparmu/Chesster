@@ -607,6 +607,20 @@ const handlePieceClick = (e) => {
         for (let i = 0; i < movesToRemove.length; i++) {
             possibleMovesOfPiece.splice(possibleMovesOfPiece.indexOf(movesToRemove[i]), 1)
         }
+
+        if (possibleMovesOfPiece.length === 0) {
+            if (!isCheck) {
+                setTimeout(() => {
+                    alert('Stalemate!')
+                }, 100)
+            }
+            else {
+                setTimeout(() => {
+                    alert('Checkmate!')
+                }, 100)
+            }
+            return
+        }
         
         if (possibleMovesOfPiece != undefined && possibleMovesOfPiece.length > 0) {
             for (let i = 0; i < possibleMovesOfPiece.length; i++) {
@@ -768,20 +782,6 @@ const handleSquareClick = (e) => {
             checkIfPromotion(nextMoveAICell, lastAICell)
             checkIfPawnCaptureEnPassant(nextMoveAICell)
             actualBoard = getActualBoard()
-            const possibleWhiteMoves = getOneSidePossibleMoves('white', actualBoard, true)
-            if (possibleWhiteMoves.length === 0) {
-                if (!isCheck) {
-                    setTimeout(() => {
-                        alert('Stalemate!')
-                    }, 100)
-                }
-                else {
-                    setTimeout(() => {
-                        alert('Checkmate!')
-                    }, 100)
-                }
-                return
-            }
 
             turn = turn === 'white' ? 'black' : 'white'
             lastPieceMovedByOpponent = dataArray[2]
@@ -1183,64 +1183,55 @@ const checkIfPawnCapture = (pos, board) => {
         if (row - 1 < 0 || col + 1 > 7 || col - 1 < 0) return false
         const pieceToCapture1 = board[row-1][col+1]
         const pieceToCapture2 = board[row-1][col-1]
-        const pawnEnPassant1 = board[row][col+1]
-        const pawnEnPassant2 = board[row][col-1]
+        const pawnEnPassant1 = document.querySelector(`[data-row="${row}"][data-col="${col+1}"]`)
+        const pawnEnPassant2 = document.querySelector(`[data-row="${row}"][data-col="${col-1}"]`)
 
-        if (pieceToCapture1 !== ' ') {
-            if (pieceToCapture1 !== ' ' && pieceToCapture1 === pieceToCapture1.toLowerCase()) {
-                possibleCaptures.push([row-1, col+1])
-            }
-        } 
-        if (pieceToCapture2 !== ' ') {
-            if (pieceToCapture2 !== ' ' && pieceToCapture2 === pieceToCapture2.toLowerCase()) {
-                possibleCaptures.push([row-1, col-1])
-            }
+        if (pieceToCapture1 !== ' ' && pieceToCapture1 === pieceToCapture1?.toLowerCase()) {
+            possibleCaptures.push([row-1, col+1])
         }
-        // if (pawnEnPassant1 != null) {
-        //     if (pawnEnPassant1.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant1.getAttribute('data-type') === 'p') {
-        //         const enPassantSquare = document.querySelector(`[data-row="${row-1}"][data-col="${col+1}"]`)
-        //         enPassantSquare.setAttribute('enpassantcapture', 'true')
-        //         possibleMoves.push(enPassantSquare)
-        //     }
-        // }
-        // if (pawnEnPassant2 != null) {
-        //     if (pawnEnPassant2.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant2.getAttribute('data-type') === 'p') {
-        //         const enPassantSquare = document.querySelector(`[data-row="${row-1}"][data-col="${col-1}"]`)
-        //         enPassantSquare.setAttribute('enpassantcapture', 'true')
-        //         possibleMoves.push(enPassantSquare)
-        //     }
-        // }
+
+        if (pieceToCapture2 !== ' ' && pieceToCapture2 === pieceToCapture2?.toLowerCase()) {
+            possibleCaptures.push([row-1, col-1])
+        }
+
+        if (pawnEnPassant1?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant1?.getAttribute('data-type') === 'p') {
+            const enPassantSquare = document.querySelector(`[data-row="${row-1}"][data-col="${col+1}"]`)
+            enPassantSquare.setAttribute('enpassantcapture', 'true')
+            possibleMoves.push(enPassantSquare)
+        }
+ 
+        if (pawnEnPassant2?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant2?.getAttribute('data-type') === 'p') {
+            const enPassantSquare = document.querySelector(`[data-row="${row-1}"][data-col="${col-1}"]`)
+            enPassantSquare.setAttribute('enpassantcapture', 'true')
+            possibleMoves.push(enPassantSquare)
+        }
     }
     else if (board[row][col] === 'p') {
         if (row + 1 > 7 || col + 1 > 7 || col - 1 < 0) return false
         const pieceToCapture1 = board[row+1][col+1]
         const pieceToCapture2 = board[row+1][col-1]
-        const pawnEnPassant1 = board[row][col+1]
-        const pawnEnPassant2 = board[row][col-1]
-        if (pieceToCapture1 !== ' ') {
-            if (pieceToCapture1 === pieceToCapture1.toUpperCase()) {
-                possibleCaptures.push([row+1, col+1])
-            }
+        const pawnEnPassant1 = document.querySelector(`[data-row="${row}"][data-col="${col+1}"]`)
+        const pawnEnPassant2 = document.querySelector(`[data-row="${row}"][data-col="${col-1}"]`)
+
+        if (pieceToCapture1 !== ' ' && pieceToCapture1 === pieceToCapture1?.toUpperCase()) {
+            possibleCaptures.push([row+1, col+1])
         } 
-        if (pieceToCapture2 !== ' ') {
-            if (pieceToCapture2 === pieceToCapture2.toUpperCase()) {
-                possibleCaptures.push([row+1, col-1])
-            }
+
+        if (pieceToCapture2 !== ' ' && pieceToCapture2 === pieceToCapture2?.toUpperCase()) {
+            possibleCaptures.push([row+1, col-1])
         }
-        // if (pawnEnPassant1 != null) {
-        //     if (pawnEnPassant1.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant1.getAttribute('data-type') === 'P') {
-        //         const enPassantSquare = document.querySelector(`[data-row="${row+1}"][data-col="${col+1}"]`)
-        //         enPassantSquare.setAttribute('enpassantcapture', 'true')
-        //         possibleMoves.push(enPassantSquare)
-        //     }
-        // }
-        // if (pawnEnPassant2 != null) {
-        //     if (pawnEnPassant2.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant2.getAttribute('data-type') === 'P') {
-        //         const enPassantSquare = document.querySelector(`[data-row="${row+1}"][data-col="${col-1}"]`)
-        //         enPassantSquare.setAttribute('enpassantcapture', 'true')
-        //         possibleMoves.push(enPassantSquare)
-        //     }
-        // }
+
+        if (pawnEnPassant1?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant1?.getAttribute('data-type') === 'P') {
+            const enPassantSquare = document.querySelector(`[data-row="${row+1}"][data-col="${col+1}"]`)
+            enPassantSquare.setAttribute('enpassantcapture', 'true')
+            possibleMoves.push(enPassantSquare)
+        }
+
+        if (pawnEnPassant2?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant2?.getAttribute('data-type') === 'P') {
+            const enPassantSquare = document.querySelector(`[data-row="${row+1}"][data-col="${col-1}"]`)
+            enPassantSquare.setAttribute('enpassantcapture', 'true')
+            possibleMoves.push(enPassantSquare)
+        }
     }
     if (possibleCaptures.length > 0) return possibleCaptures
     return false
@@ -1249,12 +1240,12 @@ const checkIfPawnCapture = (pos, board) => {
 const checkIfPawnCaptureEnPassant = (nextMoveCell) => {
     const row = Number(nextMoveCell.getAttribute('data-row'))
     const col = Number(nextMoveCell.getAttribute('data-col'))
-    if (nextMoveCell.getAttribute('enpassantcapture') === 'true' && nextMoveCell.getAttribute('data-type') === 'P') {
+    if (nextMoveCell?.getAttribute('enpassantcapture') === 'true' && nextMoveCell?.getAttribute('data-type') === 'P') {
         captureSound.play()
         const pieceToCapture = document.querySelector(`[data-row="${row+1}"][data-col="${col}"]`)
         pieceToCapture.removeChild(pieceToCapture.firstChild)
     }
-    if (nextMoveCell.getAttribute('enpassantcapture') === 'true' && nextMoveCell.getAttribute('data-type') === 'p') {
+    if (nextMoveCell?.getAttribute('enpassantcapture') === 'true' && nextMoveCell?.getAttribute('data-type') === 'p') {
         captureSound.play()
         const pieceToCapture = document.querySelector(`[data-row="${row-1}"][data-col="${col}"]`)
         pieceToCapture.removeChild(pieceToCapture.firstChild)
@@ -1295,7 +1286,7 @@ const checkIfPromotion = (nextMoveCell, lastCell) => {
  
     const row = isCapture ? Number(lastCell.getAttribute('data-row')) :  Number(nextMoveCell.getAttribute('data-row'))
 
-    if (squareToCheck.getAttribute('data-type') === 'P' && row === 0) {
+    if (squareToCheck?.getAttribute('data-type') === 'P' && row === 0) {
         targetSquare.removeChild(targetSquare.firstChild)
         const promotedPiece = document.createElement('img')
         promotedPiece.src = pieces['Q']['image']
@@ -1304,7 +1295,7 @@ const checkIfPromotion = (nextMoveCell, lastCell) => {
         targetSquare.setAttribute('data-type', 'Q')
         targetSquare.appendChild(promotedPiece)
     }
-    else if (targetSquare.getAttribute('data-type') === 'p' && row === 7) {
+    else if (targetSquare?.getAttribute('data-type') === 'p' && row === 7) {
         targetSquare.removeChild(targetSquare.firstChild)
         const promotedPiece = document.createElement('img')
         promotedPiece.src = pieces['q']['image']
@@ -1356,10 +1347,10 @@ export const getOneSidePossibleMoves = (color, board, checkForCheck) => {
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const piece = board[row][col]
-            if (piece !== ' ' && piece === piece.toUpperCase() && color === 'white') {
+            if (piece !== ' ' && piece === piece?.toUpperCase() && color === 'white') {
                 piecesOfColorInBoard.push([row, col])
             }
-            else if (piece !== ' ' && piece === piece.toLowerCase() && color === 'black') {
+            else if (piece !== ' ' && piece === piece?.toLowerCase() && color === 'black') {
                 piecesOfColorInBoard.push([row, col])
             }
         }
