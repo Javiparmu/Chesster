@@ -1,4 +1,4 @@
-import { pieces } from './pieces.js'
+import { pieces } from './assets'
 import { checkIfCastleAndPlaceRook, getPossibleMoves } from './index.js'
 import { getCheck, getOneSidePossibleMoves } from './helpers'
 import movesound from './sounds/movesound.mp3'

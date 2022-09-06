@@ -1,4 +1,4 @@
-import { uciBoard } from "../uciBoard"
+import { uciBoard } from "../assets"
 import { getOpeningMoves } from "./getOpeningMoves"
 
 export const getBestMoveToOpen = async( actualFEN ) => {

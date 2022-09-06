@@ -1,5 +1,5 @@
 import { minimaxAI } from "../minimaxAI"
-import { uciBoard } from "../uciBoard"
+import { uciBoard } from "../assets"
 import { getBestMoveToOpen } from "./getBestMoveToOpen"
 
 export const getPieceToMove = async( actualFEN, isEndGame, isCheck ) => {

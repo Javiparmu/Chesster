@@ -1,11 +1,11 @@
 import "./styles/index.scss";
-import { pieces } from './pieces.js'
+import { pieces } from './assets'
 import { chessAI } from './chessAI.js'
 import movesound from './sounds/movesound.mp3'
 import capturesound from './sounds/capturesound.mp3'
 import checksound from './sounds/checksound.mp3'
 import castlesound from './sounds/castlesound.mp3'
-import { getPieceToMove, getPiecePosition, getActualBoard, getMaterialInBoard, getCheck, getGridFromFen, getOneSidePossibleMoves } from "./helpers";
+import { getPieceToMove, getActualBoard, getMaterialInBoard, getCheck, getGridFromFen, getOneSidePossibleMoves } from "./helpers";
 
 
 // Nav functions

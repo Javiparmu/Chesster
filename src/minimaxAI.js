@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js'
-import { pieces } from './pieces.js'
+import { pieces } from './assets'
 
 let game = null
 
