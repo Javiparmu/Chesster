@@ -1,12 +1,12 @@
 import "./styles/index.scss";
 import { pieces } from './pieces.js'
 import { chessAI } from './chessAI.js'
-import { minimaxAI } from "./minimaxAI.js"
 import movesound from './sounds/movesound.mp3'
-import checksound from './sounds/checksound.mp3'
 import capturesound from './sounds/capturesound.mp3'
+import checksound from './sounds/checksound.mp3'
 import castlesound from './sounds/castlesound.mp3'
-import { uciBoard } from './uciBoard.js'
+import { getPieceToMove, getPiecePosition, getActualBoard, getMaterialInBoard, getCheck, getGridFromFen, getOneSidePossibleMoves } from "./helpers";
+
 
 // Nav functions
 const primaryNav = document.querySelector('.primary-navigation')
@@ -21,7 +21,7 @@ navToggle.addEventListener('click', () => {
         primaryNav.setAttribute('data-visible', 'false')
         navToggle.setAttribute('aria-expanded', 'false')
     }
- 
+
 })
 
 // Setting up initial variables
@@ -59,37 +59,18 @@ const checkSound = new Audio(checksound)
 
 // Play again button
 const btn = document.getElementById("play-button")
-btn.addEventListener("click", function() {
-	startGame()
+btn.addEventListener("click", function () {
+    startGame()
 }, false);
 
-window.onload = function() {
+window.onload = function () {
     startGame()
 }
 
 // Timers displays
 let whitesDisplay = document.getElementsByClassName('white-timer-text'),
-blacksDisplay = document.getElementsByClassName('black-timer-text'),
-timerLine = document.getElementById('timer-line')
-
-// Creating grid from FEN
-export const createGrid = (fen) => {
-    let rows = fen.split(' ')[0].split('/')
-    let pieces = []
-    for (let i = 0; i < 8; i++) {
-        pieces[i] = []
-        const row = rows[i].split('')
-        for (let j = 0; j < row.length; j++) {
-            if (!isNaN(Number(row[j]))) {
-                for (let k = 0; k < row[j]; k++) {
-                    pieces[i].push(' ')
-                }
-            }
-            else pieces[i].push(row[j])
-        }
-    }
-    return pieces
-}
+    blacksDisplay = document.getElementsByClassName('black-timer-text'),
+    timerLine = document.getElementById('timer-line')
 
 // Game start
 const startGame = () => {
@@ -125,13 +106,13 @@ const startGame = () => {
         mobileDisplays[0].classList.remove('disabled')
     }
 
-    isBetterAI = difficulty === 'AI' ? false : true
+    isBetterAI = difficulty === 'Easy' ? false : true
 
     const grid = document.createElement('div')
     grid.classList.add('grid')
     lastGrid.appendChild(grid)
 
-    const piecesInBoard = createGrid(initialFEN)
+    const piecesInBoard = getGridFromFen(initialFEN)
 
     for (let i = 0; i < 8; i++) {
         const row = document.createElement('div')
@@ -157,11 +138,11 @@ const setInitialStateVariables = (initialFEN) => {
     whitesCanCastleRight = true
     blacksCanCastleLeft = true
     blacksCanCastleRight = true
-    const grid = createGrid(initialFEN)
+    const grid = getGridFromFen(initialFEN)
     if (grid[7][0] !== 'R') whitesCanCastleLeft = false
     if (grid[7][7] !== 'R') whitesCanCastleRight = false
     if (grid[0][0] !== 'r') blacksCanCastleLeft = false
-    if (grid[0][7] !== 'r') blacksCanCastleRight = false 
+    if (grid[0][7] !== 'r') blacksCanCastleRight = false
 
     isPieceSelected = false
     selectedPiece = null
@@ -210,7 +191,7 @@ const createFEN = () => {
 const placePiece = (cell, cellType) => {
     const piece = document.createElement('img')
     if (cellType === ' ') {
-       return
+        return
     }
     else if (cellType === cellType.toUpperCase()) {
         piece.src = pieces[`${cellType}`]['image']
@@ -287,20 +268,15 @@ function stopTimer(timerIntervalId) {
 const handlePieceClick = (e) => {
     if (isPieceSelected) {
         if (selectedPiece.getAttribute('piece-color') === e.target.getAttribute('piece-color')) {
-            for (let i = 0; i < 8; i++) {
-                for (let j = 0; j < 8; j++) {
-                    const cell = document.getElementsByClassName('cell')[i * 8 + j]
-                    cell.classList.remove('highlight')
-                    cell.removeEventListener('click', handleSquareClick)
-                }
-            }
+            removeHighlightCells()
         } else {
             // Capture piece
             const nextMove = [Number(e.target.parentElement.getAttribute('data-row')), Number(e.target.parentElement.getAttribute('data-col'))]
             const row = Number(selectedPiece.parentElement.getAttribute('data-row'))
             const col = Number(selectedPiece.parentElement.getAttribute('data-col'))
             let actualBoard = getActualBoard()
-            let possibleNextMoves = checkPossibleMoves(row, col, actualBoard) 
+            let possibleNextMoves = getPossibleMoves(row, col, actualBoard)
+            possibleMoves = [...possibleNextMoves]
 
             let movesToRemove = []
             for (let i = 0; i < possibleNextMoves.length; i++) {
@@ -309,7 +285,7 @@ const handlePieceClick = (e) => {
                 const piecePos = [Number(row), Number(col)]
                 boardToCheck[nextMove[0]][nextMove[1]] = boardToCheck[piecePos[0]][piecePos[1]]
                 boardToCheck[piecePos[0]][piecePos[1]] = ' '
-                if(checkIfCheck(boardToCheck, 'white')) {
+                if (getCheck(boardToCheck, 'white')) {
                     movesToRemove.push(nextMove)
                 }
             }
@@ -317,19 +293,14 @@ const handlePieceClick = (e) => {
             for (let i = 0; i < movesToRemove.length; i++) {
                 possibleNextMoves.splice(possibleNextMoves.indexOf(movesToRemove[i]), 1)
             }
-            
+
             const nextMoveIncluded = possibleNextMoves.some(move => move[0] === nextMove[0] && move[1] === nextMove[1])
             if (nextMoveIncluded) {
                 isCapture = true
                 captureSound.play()
-                for (let i = 0; i < 8; i++) {
-                    for (let j = 0; j < 8; j++) {
-                        const cell = document.getElementsByClassName('cell')[i * 8 + j]
-                        cell.classList.remove('highlight')
-                        cell.removeEventListener('click', handleSquareClick)
-                        cell.removeAttribute('isdoublemovepawn')
-                    }
-                }
+
+                removeHighlightCells()
+
                 const pieceMoved = selectedPiece.cloneNode(true)
                 const nextCell = e.target.parentElement
                 pieceMoved.addEventListener('click', handlePieceClick)
@@ -354,225 +325,47 @@ const handlePieceClick = (e) => {
                 }
 
                 halfClock = 0
-                turn = turn === 'white' ? 'black' : 'white'
-                lastPieceMovedByOpponent = nextCell.firstChild
 
-                actualFEN = createFEN()
-                actualBoard = getActualBoard()
-                const nextMovePos = [nextCell.getAttribute('data-row'), nextCell.getAttribute('data-col')]
-                isCheck = checkIfCheck(actualBoard, 'black')
-                if (isCheck) checkSound.play()
+                lastPieceMovedByOpponent = nextCell.firstChild
+                changeTurn()
 
                 // AI moves
                 if (mode === 'PvsAI' && turn === 'black') {
                     let bestMove = null
                     let pieceToMove = null
-                    let pieceToMovePos = null
                     if (!isBetterAI) {
                         actualBoard = getActualBoard()
                         const bestMoveData = chessAI.getPieceToMove(isCheck, isEndGame)
                         pieceToMove = bestMoveData[0]
                         bestMove = bestMoveData[1]
                         AISelectedPiece = pieceToMove
-        
+
                         if (pieceToMove === null) {
-                            if (!isCheck) {
-                                setTimeout(() => {
-                                    alert('Stalemate!')
-                                }, 100)
-                            }
-                            else {
-                                setTimeout(() => {
-                                    alert('Checkmate!')
-                                }, 100)
-                            }
+                            showCheckMessage()
                             return
                         }
 
-                        if (pieceToMove.parentElement.getAttribute('data-type').toUpperCase() === 'P' || actualBoard[bestMove[0]][bestMove[1]] !== ' ') {
-                            halfClock = 0
-                        }
-                        else halfClock++
-
-                        let actualBoard = getActualBoard()
-                        pieceToMovePos = [Number(pieceToMove.parentElement.getAttribute('data-row')), Number(pieceToMove.parentElement.getAttribute('data-col'))]
-                        const dataArray = chessAI.makeMove(bestMove, pieceToMovePos, actualBoard, isDoubleMovePawn, blacksCanCastleRight, blacksCanCastleLeft)
-
-                        const materialLeft = getMaterialInBoard()
-                        if (materialLeft[0] < 1400 && materialLeft[1] < 1400) {
-                            isEndGame = true
-                        }
-
-                        const nextMoveAICell = dataArray[1]
-                        const lastAICell = dataArray[0]
-                        blacksCanCastleRight = dataArray[4]
-                        blacksCanCastleLeft = dataArray[5]
-                
-                        isDoubleMovePawn = dataArray[3]
-                        checkIfPromotion(nextMoveAICell, lastAICell)
-                        checkIfPawnCaptureEnPassant(nextMoveAICell)
-                        actualBoard = getActualBoard()
-                        const possibleWhiteMoves = getOneSidePossibleMoves('white', actualBoard, true)
-                        if (possibleWhiteMoves.length === 0) {
-                            if (!isCheck) {
-                                setTimeout(() => {
-                                    alert('Stalemate!')
-                                }, 100)
-                            }
-                            else {
-                                setTimeout(() => {
-                                    alert('Checkmate!')
-                                }, 100)
-                            }
-                            return
-                        }
-
+                        makeMove(pieceToMove, bestMove)
                         startTimer(whiteTime, whitesDisplay, 'white')
-
-                        turn = turn === 'white' ? 'black' : 'white'
-                        lastPieceMovedByOpponent = dataArray[2]
-                        actualFEN = createFEN()
-                        const nextMoveAI = [nextMoveAICell.getAttribute('data-row'), nextMoveAICell.getAttribute('data-col')]
-                        isCheck = checkIfCheck(actualBoard, 'white')
-                        if (isCheck) checkSound.play()
+                        changeTurn()
                     }
                     else {
                         const boardToCheck = getActualBoard()
-                        let bestOpeningMove = null
-                        let averageBlackWin = 0
-                        let openingMoves = null
                         let actualFEN = chessAI.getFenFromBoard(boardToCheck, halfClock, whitesCanCastleRight, whitesCanCastleLeft, blacksCanCastleRight, blacksCanCastleLeft)
 
-                        // Fetch for opening moves
-                        const bestMoveData = () => {
-                            return new Promise((resolve, reject) => {
-                                fetch(`https://explorer.lichess.ovh/masters?fen=${actualFEN}`, {method: 'GET'})
-                                        .then(response => response.json())
-                                        .then(data => {
-                                            if (data.black === 0) {
-                                                resolve(null)
-                                            }
-                                            else {
-                                                openingMoves = data.moves
-                                                for (let i = 0; i < openingMoves.length; i++) {
-                                                    const sum = openingMoves[i].white + openingMoves[i].black + openingMoves[i].draws
-                                                    const blackPercentage = openingMoves[i].black / sum
-                                                    if (blackPercentage > averageBlackWin) {
-                                                        averageBlackWin = blackPercentage
-                                                        bestOpeningMove = openingMoves[i].uci
-                                                    }
-                                                }
-                                
-                                                let startingPos = []
-                                                let endingPos = []
-                                                for (let i = 0; i < uciBoard.length; i++) {
-                                                    for (let j = 0; j < uciBoard[i].length; j++) {
-                                                        if (uciBoard[i][j] === bestOpeningMove.slice(0, 2)) {
-                                                            startingPos = [i, j]
-                                                        }
-                                                        else if (uciBoard[i][j] === bestOpeningMove.slice(2, 5)) {
-                                                            endingPos = [i, j]
-                                                        }
-                                                    }
-                                                }
-                                                const bestMoveToOpen = [startingPos, endingPos]
-                                                resolve(bestMoveToOpen)
-                                            }
-                                        })
-                            })}
-                        async function fetchOpeningMoves() {
-                            const data = await bestMoveData()
-                            return data
-                        }
-                        fetchOpeningMoves().then(data => {
-                            if (data === null) {
-                                // Check move from algorithm if no opening moves
-                                data = minimaxAI.minimaxRoot(3, actualFEN, true, isEndGame)
-                                if (data === null) {
-                                    if (!isCheck) {
-                                        setTimeout(() => {
-                                            alert('Stalemate!')
-                                        }, 100)
-                                    }
-                                    else {
-                                        setTimeout(() => {
-                                            alert('Checkmate!')
-                                        }, 100)
-                                    }
-                                    return
-                                }
-                                bestMove = data.to
-                                pieceToMovePos = data.from
-                            }
-                            else {
-                                pieceToMovePos = data[0]
-                                bestMove = data[1]
-                            }
-                            for (let i = 0; i < uciBoard.length; i++) {
-                                for (let j = 0; j < uciBoard[i].length; j++) {
-                                    if (uciBoard[i][j] === pieceToMovePos) {
-                                        pieceToMovePos = [i, j]
-                                    }
-                                    if (uciBoard[i][j] === bestMove) {
-                                        bestMove = [i, j]
-                                    }
-                                }
-                            }
-                            pieceToMove = document.querySelector(`[data-row="${pieceToMovePos[0]}"][data-col="${pieceToMovePos[1]}"]`)
-                            if (pieceToMove.getAttribute('data-type').toUpperCase() === 'P' || boardToCheck[bestMove[0]][bestMove[1]] !== ' ') {
-                                halfClock = 0
-                            }
-                            else halfClock++
+                        // Fetch for opening moves and get piece to move
+                        getPieceToMove(actualFEN, isEndGame, isCheck).then(pieceToMoveData => {
+                            const bestMove = pieceToMoveData[1]
+                            const pieceToMove = pieceToMoveData[0].firstChild
 
-                            let actualBoard = getActualBoard()
-                            const dataArray = chessAI.makeMove(bestMove, pieceToMovePos, actualBoard, isDoubleMovePawn, blacksCanCastleRight, blacksCanCastleLeft)
-
-                            const materialLeft = getMaterialInBoard()
-                            if (materialLeft[0] < 1400 && materialLeft[1] < 1400) {
-                                isEndGame = true
-                            }
-
-                            const nextMoveAICell = dataArray[1]
-                            const lastAICell = dataArray[0]
-                            blacksCanCastleRight = dataArray[4]
-                            blacksCanCastleLeft = dataArray[5]
-                    
-                            isDoubleMovePawn = dataArray[3]
-                            checkIfPromotion(nextMoveAICell, lastAICell)
-                            checkIfPawnCaptureEnPassant(nextMoveAICell)
-                            actualBoard = getActualBoard()
-                            const possibleWhiteMoves = getOneSidePossibleMoves('white', actualBoard, true)
-                            if (possibleWhiteMoves.length === 0) {
-                                if (!isCheck) {
-                                    setTimeout(() => {
-                                        alert('Stalemate!')
-                                    }, 100)
-                                }
-                                else {
-                                    setTimeout(() => {
-                                        alert('Checkmate!')
-                                    }, 100)
-                                }
-                                return
-                            }
-
-                            turn = turn === 'white' ? 'black' : 'white'
-                            lastPieceMovedByOpponent = dataArray[2]
-                            actualFEN = createFEN()
-                            isCheck = checkIfCheck(actualBoard, 'white')
-                            if (isCheck) checkSound.play()
+                            makeMove(pieceToMove, bestMove)
+                            changeTurn()
                         })
                     }
                 }
                 return
             }
-            for (let i = 0; i < 8; i++) {
-                for (let j = 0; j < 8; j++) {
-                    const cell = document.getElementsByClassName('cell')[i * 8 + j]
-                    cell.classList.remove('highlight')
-                    cell.removeEventListener('click', handleSquareClick)
-                }
-            }
+            removeHighlightCells()
         }
     }
 
@@ -590,7 +383,8 @@ const handlePieceClick = (e) => {
         let pieceThatCheckedPos = []
         if (lastPieceMovedByOpponent !== null) pieceThatCheckedPos = [Number(lastPieceMovedByOpponent.parentElement.getAttribute('data-row')), Number(lastPieceMovedByOpponent.parentElement.getAttribute('data-col'))]
         let possibleMovesOfPiece = []
-        possibleMovesOfPiece = checkPossibleMoves(row, col, actualBoard)
+        possibleMovesOfPiece = getPossibleMoves(row, col, actualBoard)
+        possibleMoves = [...possibleMovesOfPiece]
 
         let movesToRemove = []
         for (let i = 0; i < possibleMovesOfPiece.length; i++) {
@@ -599,7 +393,7 @@ const handlePieceClick = (e) => {
             const piecePos = [Number(row), Number(col)]
             boardToCheck[nextMove[0]][nextMove[1]] = boardToCheck[piecePos[0]][piecePos[1]]
             boardToCheck[piecePos[0]][piecePos[1]] = ' '
-            if(checkIfCheck(boardToCheck, 'white')) {
+            if (getCheck(boardToCheck, 'white')) {
                 movesToRemove.push(nextMove)
             }
         }
@@ -609,19 +403,10 @@ const handlePieceClick = (e) => {
         }
 
         if (possibleMovesOfPiece.length === 0) {
-            if (!isCheck) {
-                setTimeout(() => {
-                    alert('Stalemate!')
-                }, 100)
-            }
-            else {
-                setTimeout(() => {
-                    alert('Checkmate!')
-                }, 100)
-            }
+            showCheckMessage()
             return
         }
-        
+
         if (possibleMovesOfPiece != undefined && possibleMovesOfPiece.length > 0) {
             for (let i = 0; i < possibleMovesOfPiece.length; i++) {
                 if (mode === 'PvsP' || (mode === 'PvsAI' && turn === 'white')) {
@@ -643,14 +428,7 @@ const handleSquareClick = (e) => {
     isCapture = false
     if (mode === 'PvsAI' && turn === 'black') selectedPiece = AISelectedPiece
 
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-            const cell = document.getElementsByClassName('cell')[i * 8 + j]
-            cell.classList.remove('highlight')
-            cell.removeEventListener('click', handleSquareClick)
-            cell.removeAttribute('isdoublemovepawn')
-        }
-    }
+    removeHighlightCells()
 
     const nextCell = e.target
     const nextMove = [nextCell.getAttribute('data-row'), nextCell.getAttribute('data-col')]
@@ -661,16 +439,16 @@ const handleSquareClick = (e) => {
     const selectedPieceType = selectedPiece.parentElement.getAttribute('data-type')
     const selectedPieceRow = selectedPiecePos[0]
     const selectedPieceCol = selectedPiecePos[1]
-    if (selectedPieceType === 'K' || (selectedPieceType === 'R' && selectedPieceRow === '7' && selectedPieceCol === '0')){
+    if (selectedPieceType === 'K' || (selectedPieceType === 'R' && selectedPieceRow === '7' && selectedPieceCol === '0')) {
         whitesCanCastleLeft = false
-    } 
-    if (selectedPieceType === 'K' || (selectedPieceType === 'R' && selectedPieceRow === '7' && selectedPieceCol === '7')){
+    }
+    if (selectedPieceType === 'K' || (selectedPieceType === 'R' && selectedPieceRow === '7' && selectedPieceCol === '7')) {
         whitesCanCastleRight = false
     }
-    if (selectedPieceType === 'k' || (selectedPieceType === 'r' && selectedPieceRow === '0' && selectedPieceCol === '0')){
+    if (selectedPieceType === 'k' || (selectedPieceType === 'r' && selectedPieceRow === '0' && selectedPieceCol === '0')) {
         blacksCanCastleLeft = false
     }
-    if (selectedPieceType === 'k' || (selectedPieceType === 'r' && selectedPieceRow === '0' && selectedPieceCol === '7')){
+    if (selectedPieceType === 'k' || (selectedPieceType === 'r' && selectedPieceRow === '0' && selectedPieceCol === '7')) {
         blacksCanCastleRight = false
     }
 
@@ -679,14 +457,14 @@ const handleSquareClick = (e) => {
     if (selectedPiece.parentElement.getAttribute('data-type') === 'P') {
         halfClock = 0
         const row = Number(selectedPiece.parentElement.getAttribute('data-row'))
-        if (Number(cell.getAttribute('data-row')) === row-2) {
+        if (Number(cell.getAttribute('data-row')) === row - 2) {
             isDoubleMovePawn = true
         }
     }
     else if (selectedPiece.parentElement.getAttribute('data-type') === 'p') {
         halfClock = 0
         const row = Number(selectedPiece.parentElement.getAttribute('data-row'))
-        if (Number(cell.getAttribute('data-row')) === row+2) {
+        if (Number(cell.getAttribute('data-row')) === row + 2) {
             isDoubleMovePawn = true
         }
     }
@@ -701,7 +479,7 @@ const handleSquareClick = (e) => {
 
     selectedPiece.parentElement.setAttribute('data-type', ' ')
     if (selectedPiece.parentElement.getAttribute('isdoublemovepawn') === 'true') selectedPiece.parentElement.removeAttribute('isdoublemovepawn')
-    if (selectedPiece.parentElement.getAttribute('enpassantcapture') === 'true') selectedPiece.parentElement.removeAttribute('enpassantcapture') 
+    if (selectedPiece.parentElement.getAttribute('enpassantcapture') === 'true') selectedPiece.parentElement.removeAttribute('enpassantcapture')
     selectedPiece.parentElement.removeChild(selectedPiece)
 
     const pieceElement = document.createElement('img')
@@ -723,323 +501,41 @@ const handleSquareClick = (e) => {
         startTimer(whiteTime, whitesDisplay, 'white')
     }
 
-    turn = turn === 'white' ? 'black' : 'white'
-
     lastPieceMovedByOpponent = e.target.firstChild
-    actualFEN = createFEN()
-    actualBoard = getActualBoard()
-    const nextMovePos = [nextMoveCell.getAttribute('data-row'), nextMoveCell.getAttribute('data-col')]
-    isCheck = checkIfCheck(actualBoard, 'black')
-    if (isCheck) checkSound.play()
+
+    changeTurn()
 
     // AI moves
     if (mode === 'PvsAI' && turn === 'black') {
-        let bestMove = null
-        let pieceToMove = null
-        let pieceToMovePos = null
-
         if (!isBetterAI) {
             actualBoard = getActualBoard()
             const bestMoveData = chessAI.getPieceToMove(isCheck, isEndGame)
-            pieceToMove = bestMoveData[0]
-            bestMove = bestMoveData[1]
+            const pieceToMove = bestMoveData[0]
+            const bestMove = bestMoveData[1]
             AISelectedPiece = pieceToMove
 
             if (pieceToMove === null) {
-                if (!isCheck) {
-                    setTimeout(() => {
-                        alert('Stalemate!')
-                    }, 100)
-                }
-                else {
-                    setTimeout(() => {
-                        alert('Checkmate!')
-                    }, 100)
-                }
+                showCheckMessage()
                 return
             }
 
-            if (pieceToMove.parentElement.getAttribute('data-type').toUpperCase() === 'P' || actualBoard[bestMove[0]][bestMove[1]] !== ' ') {
-                halfClock = 0
-            }
-            else halfClock++
-
-            let actualBoard = getActualBoard()
-            pieceToMovePos = [Number(pieceToMove.parentElement.getAttribute('data-row')), Number(pieceToMove.parentElement.getAttribute('data-col'))]
-            const dataArray = chessAI.makeMove(bestMove, pieceToMovePos, actualBoard, isDoubleMovePawn, blacksCanCastleRight, blacksCanCastleLeft)
-
-            const materialLeft = getMaterialInBoard()
-            if (materialLeft[0] < 1400 && materialLeft[1] < 1400) {
-                isEndGame = true
-            }
-
-            const nextMoveAICell = dataArray[1]
-            const lastAICell = dataArray[0]
-            blacksCanCastleRight = dataArray[4]
-            blacksCanCastleLeft = dataArray[5]
-    
-            isDoubleMovePawn = dataArray[3]
-            checkIfPromotion(nextMoveAICell, lastAICell)
-            checkIfPawnCaptureEnPassant(nextMoveAICell)
-            actualBoard = getActualBoard()
-
-            turn = turn === 'white' ? 'black' : 'white'
-            lastPieceMovedByOpponent = dataArray[2]
-            actualFEN = createFEN()
-            isCheck = checkIfCheck(actualBoard, 'white')
-            if (isCheck) checkSound.play()
+            makeMove(pieceToMove, bestMove)
+            changeTurn()
         }
         else {
             const boardToCheck = getActualBoard()
-            let bestOpeningMove = null
-            let averageBlackWin = 0
-            let openingMoves = null
-            let actualFEN = chessAI.getFenFromBoard(boardToCheck,  halfClock, whitesCanCastleRight, whitesCanCastleLeft, blacksCanCastleRight, blacksCanCastleLeft)
+            let actualFEN = chessAI.getFenFromBoard(boardToCheck, halfClock, whitesCanCastleRight, whitesCanCastleLeft, blacksCanCastleRight, blacksCanCastleLeft)
 
             // Fetch for opening moves
-            const bestMoveData = () => {
-                return new Promise((resolve, reject) => {
-                    fetch(`https://explorer.lichess.ovh/masters?fen=${actualFEN}`, {method: 'GET'})
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.black === 0) {
-                                    resolve(null)
-                                }
-                                else {
-                                    openingMoves = data.moves
-                                    for (let i = 0; i < openingMoves.length; i++) {
-                                        const sum = openingMoves[i].white + openingMoves[i].black + openingMoves[i].draws
-                                        const blackPercentage = openingMoves[i].black / sum
-                                        if (blackPercentage > averageBlackWin) {
-                                            averageBlackWin = blackPercentage
-                                            bestOpeningMove = openingMoves[i].uci
-                                        }
-                                    }
-                    
-                                    let startingPos = []
-                                    let endingPos = []
-                                    for (let i = 0; i < uciBoard.length; i++) {
-                                        for (let j = 0; j < uciBoard[i].length; j++) {
-                                            if (uciBoard[i][j] === bestOpeningMove.slice(0, 2)) {
-                                                startingPos = [i, j]
-                                            }
-                                            else if (uciBoard[i][j] === bestOpeningMove.slice(2, 5)) {
-                                                endingPos = [i, j]
-                                            }
-                                        }
-                                    }
-                                    const bestMoveToOpen = [startingPos, endingPos]
-                                    resolve(bestMoveToOpen)
-                                }
-                            })
-                })}
-            async function fetchOpeningMoves() {
-                const data = await bestMoveData()
-                return data
-            }
-            fetchOpeningMoves().then(data => {
-                if (data === null) {
-                    data = minimaxAI.minimaxRoot(3, actualFEN, true, isEndGame)
-                    if (data === null) {
-                        if (!isCheck) {
-                            setTimeout(() => {
-                                alert('Stalemate!')
-                            }, 100)
-                        }
-                        else {
-                            setTimeout(() => {
-                                alert('Checkmate!')
-                            }, 100)
-                        }
-                        return
-                    }
-                    bestMove = data.to
-                    pieceToMovePos = data.from
-                }
-                else {
-                    pieceToMovePos = data[0]
-                    bestMove = data[1]
-                }
-                for (let i = 0; i < uciBoard.length; i++) {
-                    for (let j = 0; j < uciBoard[i].length; j++) {
-                        if (uciBoard[i][j] === pieceToMovePos) {
-                            pieceToMovePos = [i, j]
-                        }
-                        if (uciBoard[i][j] === bestMove) {
-                            bestMove = [i, j]
-                        }
-                    }
-                }
-                console.log(pieceToMovePos, bestMove)
-                pieceToMove = document.querySelector(`[data-row="${pieceToMovePos[0]}"][data-col="${pieceToMovePos[1]}"]`)
-                console.log(pieceToMove)
+            getPieceToMove(actualFEN, isEndGame, isCheck).then(pieceToMoveData => {
+                const bestMove = pieceToMoveData[1]
+                const pieceToMove = pieceToMoveData[0].firstChild
 
-                if (pieceToMove.getAttribute('data-type').toUpperCase() === 'P' || boardToCheck[bestMove[0]][bestMove[1]] !== ' ') {
-                    halfClock = 0
-                }
-                else halfClock++
-                let actualBoard = getActualBoard()
-                const dataArray = chessAI.makeMove(bestMove, pieceToMovePos, actualBoard, isDoubleMovePawn, blacksCanCastleRight, blacksCanCastleLeft)
-
-                const materialLeft = getMaterialInBoard()
-                if (materialLeft[0] < 1400 && materialLeft[1] < 1400) {
-                    isEndGame = true
-                }
-
-                const nextMoveAICell = dataArray[1]
-                const lastAICell = dataArray[0]
-                blacksCanCastleRight = dataArray[4]
-                blacksCanCastleLeft = dataArray[5]
-        
-                isDoubleMovePawn = dataArray[3]
-                checkIfPromotion(nextMoveAICell, lastAICell)
-                checkIfPawnCaptureEnPassant(nextMoveAICell)
-                actualBoard = getActualBoard()
-                const possibleWhiteMoves = getOneSidePossibleMoves('white', actualBoard, true)
-                if (possibleWhiteMoves.length === 0) {
-                    if (!isCheck) {
-                        setTimeout(() => {
-                            alert('Stalemate!')
-                        }, 100)
-                    }
-                    else {
-                        setTimeout(() => {
-                            alert('Checkmate!')
-                        }, 100)
-                    }
-                    return
-                }
-
-                turn = turn === 'white' ? 'black' : 'white'
-                lastPieceMovedByOpponent = dataArray[2]
-                actualFEN = createFEN()
-                const nextMoveAI = [nextMoveAICell.getAttribute('data-row'), nextMoveAICell.getAttribute('data-col')]
-                isCheck = checkIfCheck(actualBoard, 'white')
-                if (isCheck) checkSound.play()
+                makeMove(pieceToMove, bestMove)
+                changeTurn()
             })
         }
     }
-}
-
-export const checkPossibleMoves = (row, col, board) => {
-    let possibleNextMoves = []
-
-    const pieceType = board[Number(row)][Number(col)]
-    const moves = pieces[pieceType]['moves']
-
-    if (whitesCanCastleLeft && pieceType === 'K' && row === '7' && col === '4') {
-        const castleSquare1 = board[7][1]
-        const castleSquare2 = board[7][2]
-        const castleSquare3 = board[7][3]
-
-        if (castleSquare1 === ' ' && castleSquare2 === ' ' && castleSquare3 === ' ') {
-            possibleNextMoves.push([7, 2])
-        }
-    }
-    if (whitesCanCastleRight && pieceType === 'K' && row === '7' && col === '4') {
-        const castleSquare1 = board[7][5]
-        const castleSquare2 = board[7][6]
-
-        if (castleSquare1 === ' ' && castleSquare2 === ' ') {
-            possibleNextMoves.push([7, 6])
-        }
-    }
-    if (blacksCanCastleLeft && pieceType === 'k' && row === '0' && col === '4') {
-        const castleSquare1 = board[0][1]
-        const castleSquare2 = board[0][2]
-        const castleSquare3 = board[0][3]
-
-        if (castleSquare1 === ' ' && castleSquare2 === ' ' && castleSquare3 === ' ') {
-            possibleNextMoves.push([0, 2])
-        }
-    }
-    if (blacksCanCastleRight && pieceType === 'k' && row === '0' && col === '4') {
-        const castleSquare1 = board[0][5]
-        const castleSquare2 = board[0][6]
-
-        if (castleSquare1 === ' ' && castleSquare2 === ' ') {
-            possibleNextMoves.push([0, 6])
-        }
-    }
-
-    if (pieceType.toUpperCase() === 'P') {
-        const position = [Number(row), Number(col)]
-        const pawnCaptures = checkIfPawnCapture(position, board)
-        if (pawnCaptures !== false) {
-            for (let i = 0; i < pawnCaptures.length; i++) {
-                possibleNextMoves.push(pawnCaptures[i])
-            }
-        }
-        if (checkIfPawnsInitialMove(position, board)){
-            if (pieceType === 'p') {
-                possibleNextMoves.push([Number(row) + 2, Number(col)])
-            }
-            else {
-                possibleNextMoves.push([Number(row) - 2, Number(col)])
-            }
-        }
-    }
-
-    for (let i = 0; i < moves.length; i++) {
-        let newRows = []
-        let newCols = []
-        if (pieceType.toUpperCase() === 'P' || pieceType.toUpperCase() === 'N' || pieceType.toUpperCase() === 'K') {
-            newRows.push(Number(row) + moves[i][0])
-            newCols.push(Number(col) + moves[i][1])
-        }
-        else {
-            for (let j = 0; j < 7; j++) {
-                if (moves[i][0] > 0) {
-                    newRows.push(Number(row) + moves[i][0] + j)
-                }
-                else if (moves[i][0] < 0) {
-                    newRows.push(Number(row) + moves[i][0] - j)
-                }
-                else if (moves[i][0] === 0) {
-                    newRows.push(Number(row))
-                }
-                if (moves[i][1] > 0) {
-                    newCols.push(Number(col) + moves[i][1] + j)
-                }
-                else if (moves[i][1] < 0) {
-                    newCols.push(Number(col) + moves[i][1] - j)
-                }
-                else if (moves[i][1] === 0) {
-                    newCols.push(Number(col))
-                }
-            }
-        }
-
-        let nextMove = []
-        for (let j = 0; j < newRows.length; j++) {
-            nextMove = [newRows[j], newCols[j]]
-            if (isValidMove([Number(row), Number(col)], nextMove, board) === false) {
-                newRows.splice(j, newRows.length - j)
-                newCols.splice(j, newCols.length - j)
-                break
-            }
-            else if (isValidMove([Number(row), Number(col)], nextMove, board) === 'capture') {
-                newRows.splice(j + 1, newRows.length - j)
-            }
-        }
-        if (newRows.length > 0) {
-            for (let j = 0; j < newRows.length; j++) {
-                nextMove = [newRows[j], newCols[j]]
-                const newCell = board[newRows[j]][newCols[j]]
-                const newCellColor = newCell.toUpperCase() === newCell ? 'white' : 'black'
-                const pieceToMoveColor = pieceType.toUpperCase() === pieceType ? 'white' : 'black'
-                if (newCell === ' ') {
-                    possibleNextMoves.push(nextMove)
-                }
-                else if (newCellColor !== pieceToMoveColor) {
-                    possibleNextMoves.push(nextMove)
-                }
-            }
-        }
-    }
-
-    possibleMoves = [...possibleNextMoves]
-    return possibleNextMoves
 }
 
 const isValidMove = (pieceToMovePos, nextMove, board) => {
@@ -1153,7 +649,7 @@ export const checkIfCastleAndPlaceRook = (nextMove, pieceToMovePos, board) => {
         let blackRook = null
         let blackRookCastleSquare = null
         let rookMoved = null
-        if (blacksCanCastleRight && nextCellRow=== 0 && nextCellCol === 6) {
+        if (blacksCanCastleRight && nextCellRow === 0 && nextCellCol === 6) {
             blackRook = document.querySelector('[data-row="0"][data-col="7"]').firstChild
             blackRookCastleSquare = document.querySelector('[data-row="0"][data-col="5"]')
             rookMoved = blackRook.cloneNode(true)
@@ -1181,54 +677,54 @@ const checkIfPawnCapture = (pos, board) => {
     let possibleCaptures = []
     if (board[row][col] === 'P') {
         if (row - 1 < 0 || col + 1 > 7 || col - 1 < 0) return false
-        const pieceToCapture1 = board[row-1][col+1]
-        const pieceToCapture2 = board[row-1][col-1]
-        const pawnEnPassant1 = document.querySelector(`[data-row="${row}"][data-col="${col+1}"]`)
-        const pawnEnPassant2 = document.querySelector(`[data-row="${row}"][data-col="${col-1}"]`)
+        const pieceToCapture1 = board[row - 1][col + 1]
+        const pieceToCapture2 = board[row - 1][col - 1]
+        const pawnEnPassant1 = document.querySelector(`[data-row="${row}"][data-col="${col + 1}"]`)
+        const pawnEnPassant2 = document.querySelector(`[data-row="${row}"][data-col="${col - 1}"]`)
 
         if (pieceToCapture1 !== ' ' && pieceToCapture1 === pieceToCapture1?.toLowerCase()) {
-            possibleCaptures.push([row-1, col+1])
+            possibleCaptures.push([row - 1, col + 1])
         }
 
         if (pieceToCapture2 !== ' ' && pieceToCapture2 === pieceToCapture2?.toLowerCase()) {
-            possibleCaptures.push([row-1, col-1])
+            possibleCaptures.push([row - 1, col - 1])
         }
 
         if (pawnEnPassant1?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant1?.getAttribute('data-type') === 'p') {
-            const enPassantSquare = document.querySelector(`[data-row="${row-1}"][data-col="${col+1}"]`)
+            const enPassantSquare = document.querySelector(`[data-row="${row - 1}"][data-col="${col + 1}"]`)
             enPassantSquare.setAttribute('enpassantcapture', 'true')
             possibleMoves.push(enPassantSquare)
         }
- 
+
         if (pawnEnPassant2?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant2?.getAttribute('data-type') === 'p') {
-            const enPassantSquare = document.querySelector(`[data-row="${row-1}"][data-col="${col-1}"]`)
+            const enPassantSquare = document.querySelector(`[data-row="${row - 1}"][data-col="${col - 1}"]`)
             enPassantSquare.setAttribute('enpassantcapture', 'true')
             possibleMoves.push(enPassantSquare)
         }
     }
     else if (board[row][col] === 'p') {
         if (row + 1 > 7 || col + 1 > 7 || col - 1 < 0) return false
-        const pieceToCapture1 = board[row+1][col+1]
-        const pieceToCapture2 = board[row+1][col-1]
-        const pawnEnPassant1 = document.querySelector(`[data-row="${row}"][data-col="${col+1}"]`)
-        const pawnEnPassant2 = document.querySelector(`[data-row="${row}"][data-col="${col-1}"]`)
+        const pieceToCapture1 = board[row + 1][col + 1]
+        const pieceToCapture2 = board[row + 1][col - 1]
+        const pawnEnPassant1 = document.querySelector(`[data-row="${row}"][data-col="${col + 1}"]`)
+        const pawnEnPassant2 = document.querySelector(`[data-row="${row}"][data-col="${col - 1}"]`)
 
         if (pieceToCapture1 !== ' ' && pieceToCapture1 === pieceToCapture1?.toUpperCase()) {
-            possibleCaptures.push([row+1, col+1])
-        } 
+            possibleCaptures.push([row + 1, col + 1])
+        }
 
         if (pieceToCapture2 !== ' ' && pieceToCapture2 === pieceToCapture2?.toUpperCase()) {
-            possibleCaptures.push([row+1, col-1])
+            possibleCaptures.push([row + 1, col - 1])
         }
 
         if (pawnEnPassant1?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant1?.getAttribute('data-type') === 'P') {
-            const enPassantSquare = document.querySelector(`[data-row="${row+1}"][data-col="${col+1}"]`)
+            const enPassantSquare = document.querySelector(`[data-row="${row + 1}"][data-col="${col + 1}"]`)
             enPassantSquare.setAttribute('enpassantcapture', 'true')
             possibleMoves.push(enPassantSquare)
         }
 
         if (pawnEnPassant2?.getAttribute('isdoublemovepawn') === 'true' && pawnEnPassant2?.getAttribute('data-type') === 'P') {
-            const enPassantSquare = document.querySelector(`[data-row="${row+1}"][data-col="${col-1}"]`)
+            const enPassantSquare = document.querySelector(`[data-row="${row + 1}"][data-col="${col - 1}"]`)
             enPassantSquare.setAttribute('enpassantcapture', 'true')
             possibleMoves.push(enPassantSquare)
         }
@@ -1242,12 +738,12 @@ const checkIfPawnCaptureEnPassant = (nextMoveCell) => {
     const col = Number(nextMoveCell.getAttribute('data-col'))
     if (nextMoveCell?.getAttribute('enpassantcapture') === 'true' && nextMoveCell?.getAttribute('data-type') === 'P') {
         captureSound.play()
-        const pieceToCapture = document.querySelector(`[data-row="${row+1}"][data-col="${col}"]`)
+        const pieceToCapture = document.querySelector(`[data-row="${row + 1}"][data-col="${col}"]`)
         pieceToCapture.removeChild(pieceToCapture.firstChild)
     }
     if (nextMoveCell?.getAttribute('enpassantcapture') === 'true' && nextMoveCell?.getAttribute('data-type') === 'p') {
         captureSound.play()
-        const pieceToCapture = document.querySelector(`[data-row="${row-1}"][data-col="${col}"]`)
+        const pieceToCapture = document.querySelector(`[data-row="${row - 1}"][data-col="${col}"]`)
         pieceToCapture.removeChild(pieceToCapture.firstChild)
     }
 }
@@ -1264,9 +760,9 @@ const checkIfPawnsInitialMove = (pos, board) => {
         else if (pieceColor === 'white' && row !== 6) {
             return
         }
-        const doubleMoveSquare = pieceColor === 'black' ? board[row+2][col] : board[row-2][col]
-        const isPieceBetweenWhiteMove = board[row-1][col] !== ' '
-        const isPieceBetweenBlackMove = board[row+1][col] !== ' '
+        const doubleMoveSquare = pieceColor === 'black' ? board[row + 2][col] : board[row - 2][col]
+        const isPieceBetweenWhiteMove = board[row - 1][col] !== ' '
+        const isPieceBetweenBlackMove = board[row + 1][col] !== ' '
 
         if (board[row][col] === 'P' && doubleMoveSquare === ' ' && !isPieceBetweenWhiteMove) {
             return true
@@ -1283,8 +779,8 @@ const checkIfPawnsInitialMove = (pos, board) => {
 const checkIfPromotion = (nextMoveCell, lastCell) => {
     const squareToCheck = isCapture ? lastCell : nextMoveCell.cloneNode(true)
     const targetSquare = isCapture ? lastCell : nextMoveCell
- 
-    const row = isCapture ? Number(lastCell.getAttribute('data-row')) :  Number(nextMoveCell.getAttribute('data-row'))
+
+    const row = isCapture ? Number(lastCell.getAttribute('data-row')) : Number(nextMoveCell.getAttribute('data-row'))
 
     if (squareToCheck?.getAttribute('data-type') === 'P' && row === 0) {
         targetSquare.removeChild(targetSquare.firstChild)
@@ -1306,128 +802,194 @@ const checkIfPromotion = (nextMoveCell, lastCell) => {
     }
 }
 
-export const checkIfCheck = (board, colorToCheck) => {
-    let possibleOppositeColorMoves = []
-    if (colorToCheck === 'white') {
-        possibleOppositeColorMoves = getOneSidePossibleMoves('black', board, false)
-        possibleOppositeColorMoves.map(move => move.splice(0, 1))
-    }
-    else if (colorToCheck === 'black') {
-        possibleOppositeColorMoves = getOneSidePossibleMoves('white', board, false)
-        possibleOppositeColorMoves.map(move => move.splice(0, 1))
-    }
+// get possible moves for a piece
+export const getPossibleMoves = (row, col, board) => {
+    let possibleNextMoves = []
 
-    let king = null
-    if (colorToCheck === 'white') king = 'K'
-    else king = 'k'
+    const pieceType = board[Number(row)][Number(col)]
+    const moves = pieces[pieceType]['moves']
 
-    let kingPos = []
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-            if (board[i][j] === king) {
-                kingPos = [i, j]
-            }
+    if (whitesCanCastleLeft && pieceType === 'K' && row === '7' && col === '4') {
+        const castleSquare1 = board[7][1]
+        const castleSquare2 = board[7][2]
+        const castleSquare3 = board[7][3]
+
+        if (castleSquare1 === ' ' && castleSquare2 === ' ' && castleSquare3 === ' ') {
+            possibleNextMoves.push([7, 2])
+        }
+    }
+    if (whitesCanCastleRight && pieceType === 'K' && row === '7' && col === '4') {
+        const castleSquare1 = board[7][5]
+        const castleSquare2 = board[7][6]
+
+        if (castleSquare1 === ' ' && castleSquare2 === ' ') {
+            possibleNextMoves.push([7, 6])
+        }
+    }
+    if (blacksCanCastleLeft && pieceType === 'k' && row === '0' && col === '4') {
+        const castleSquare1 = board[0][1]
+        const castleSquare2 = board[0][2]
+        const castleSquare3 = board[0][3]
+
+        if (castleSquare1 === ' ' && castleSquare2 === ' ' && castleSquare3 === ' ') {
+            possibleNextMoves.push([0, 2])
+        }
+    }
+    if (blacksCanCastleRight && pieceType === 'k' && row === '0' && col === '4') {
+        const castleSquare1 = board[0][5]
+        const castleSquare2 = board[0][6]
+
+        if (castleSquare1 === ' ' && castleSquare2 === ' ') {
+            possibleNextMoves.push([0, 6])
         }
     }
 
-    let isThereACheck = false
-    for (let i = 0; i < possibleOppositeColorMoves.length; i++) {
-        if (possibleOppositeColorMoves.some(cell => cell[0].some(cell => cell[0] === kingPos[0] && cell[1] === kingPos[1]))) {
-            isThereACheck = true
-        }
-    }
-    if (isThereACheck) {
-        return true
-    }
-    return false
-}
-
-export const getOneSidePossibleMoves = (color, board, checkForCheck) => {
-    let piecesOfColorInBoard = []
-    for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-            const piece = board[row][col]
-            if (piece !== ' ' && piece === piece?.toUpperCase() && color === 'white') {
-                piecesOfColorInBoard.push([row, col])
-            }
-            else if (piece !== ' ' && piece === piece?.toLowerCase() && color === 'black') {
-                piecesOfColorInBoard.push([row, col])
+    if (pieceType.toUpperCase() === 'P') {
+        const position = [Number(row), Number(col)]
+        const pawnCaptures = checkIfPawnCapture(position, board)
+        if (pawnCaptures !== false) {
+            for (let i = 0; i < pawnCaptures.length; i++) {
+                possibleNextMoves.push(pawnCaptures[i])
             }
         }
-    }
-    let possibleMovesFromSide = []
-    for (let i = 0; i < piecesOfColorInBoard.length; i++) {
-        const piecePos = piecesOfColorInBoard[i]
-        const row = Number(piecePos[0])
-        const col = Number(piecePos[1])
-        
-        let boardCopy = []
-        for (let k = 0; k < board.length; k++) {
-            boardCopy[k] = []
-            for (let l = 0; l < board[k].length; l++) {
-                boardCopy[k][l] = board[k][l]
-            }
-        }
-        if (boardCopy[row][col] !== ' ') {
-            let possibleMovesToCheck = checkPossibleMoves(row, col, boardCopy)
-
-            if (checkForCheck) {
-                let movesToRemove = []
-                for (let i = 0; i < possibleMovesToCheck.length; i++) {
-                    let boardToCheck = []
-                    board.map((row, index) => boardToCheck[index] = [...row])
-  
-                    const nextMove = possibleMovesToCheck[i]
-                    const piecePos = [Number(row), Number(col)]
-                    boardToCheck[nextMove[0]][nextMove[1]] = boardToCheck[piecePos[0]][piecePos[1]]
-                    boardToCheck[piecePos[0]][piecePos[1]] = ' '
-                    if(checkIfCheck(boardToCheck, color)) {
-                        movesToRemove.push(nextMove)
-                    }
-                }
-
-                for (let i = 0; i < movesToRemove.length; i++) {
-                    possibleMovesToCheck.splice(possibleMovesToCheck.indexOf(movesToRemove[i]), 1)
-                }
-            }
-            possibleMovesFromSide.push([piecePos, [...possibleMovesToCheck]])
-
-        }
-    }
-    return possibleMovesFromSide
-}
-
-
-const getActualBoard = () => {
-    let board = []
-    for (let i = 0; i < 8; i++) {
-        board[i] = []
-        for (let j = 0; j < 8; j++) {
-            const cellType = document.querySelector(`[data-row="${i}"][data-col="${j}"]`).getAttribute('data-type')
-            if (cellType !== ' ') {
-                board[i][j] = cellType
+        if (checkIfPawnsInitialMove(position, board)) {
+            if (pieceType === 'p') {
+                possibleNextMoves.push([Number(row) + 2, Number(col)])
             }
             else {
-                board[i][j] = ' '
+                possibleNextMoves.push([Number(row) - 2, Number(col)])
             }
         }
     }
-    return board
+
+    for (let i = 0; i < moves.length; i++) {
+        let newRows = []
+        let newCols = []
+        if (pieceType.toUpperCase() === 'P' || pieceType.toUpperCase() === 'N' || pieceType.toUpperCase() === 'K') {
+            newRows.push(Number(row) + moves[i][0])
+            newCols.push(Number(col) + moves[i][1])
+        }
+        else {
+            for (let j = 0; j < 7; j++) {
+                if (moves[i][0] > 0) {
+                    newRows.push(Number(row) + moves[i][0] + j)
+                }
+                else if (moves[i][0] < 0) {
+                    newRows.push(Number(row) + moves[i][0] - j)
+                }
+                else if (moves[i][0] === 0) {
+                    newRows.push(Number(row))
+                }
+                if (moves[i][1] > 0) {
+                    newCols.push(Number(col) + moves[i][1] + j)
+                }
+                else if (moves[i][1] < 0) {
+                    newCols.push(Number(col) + moves[i][1] - j)
+                }
+                else if (moves[i][1] === 0) {
+                    newCols.push(Number(col))
+                }
+            }
+        }
+
+        let nextMove = []
+        for (let j = 0; j < newRows.length; j++) {
+            nextMove = [newRows[j], newCols[j]]
+            if (isValidMove([Number(row), Number(col)], nextMove, board) === false) {
+                newRows.splice(j, newRows.length - j)
+                newCols.splice(j, newCols.length - j)
+                break
+            }
+            else if (isValidMove([Number(row), Number(col)], nextMove, board) === 'capture') {
+                newRows.splice(j + 1, newRows.length - j)
+            }
+        }
+        if (newRows.length > 0) {
+            for (let j = 0; j < newRows.length; j++) {
+                nextMove = [newRows[j], newCols[j]]
+                const newCell = board[newRows[j]][newCols[j]]
+                const newCellColor = newCell.toUpperCase() === newCell ? 'white' : 'black'
+                const pieceToMoveColor = pieceType.toUpperCase() === pieceType ? 'white' : 'black'
+                if (newCell === ' ') {
+                    possibleNextMoves.push(nextMove)
+                }
+                else if (newCellColor !== pieceToMoveColor) {
+                    possibleNextMoves.push(nextMove)
+                }
+            }
+        }
+    }
+
+    possibleMoves = [...possibleNextMoves]
+    return possibleNextMoves
 }
 
-const getMaterialInBoard = () => {
-    const wp = chessAI.getNumberOfPieces('white', 'P')
-    const wn = chessAI.getNumberOfPieces('white', 'N')
-    const wb = chessAI.getNumberOfPieces('white', 'B')
-    const wr = chessAI.getNumberOfPieces('white', 'R')
-    const wq = chessAI.getNumberOfPieces('white', 'Q')
-    const bp = chessAI.getNumberOfPieces('black', 'p')
-    const bn = chessAI.getNumberOfPieces('black', 'n')
-    const bb = chessAI.getNumberOfPieces('black', 'b')
-    const br = chessAI.getNumberOfPieces('black', 'r')
-    const bq = chessAI.getNumberOfPieces('black', 'q')
+const showCheckMessage = () => {
+    if (!isCheck) {
+        setTimeout(() => {
+            alert('Stalemate!')
+        }, 100)
+    }
+    else {
+        setTimeout(() => {
+            alert('Checkmate!')
+        }, 100)
+    }
+}
 
-    const blackMaterial = 100 * bp + 300 * bn + 330 * bb + 500 * br + 900 * bq
-    const whiteMaterial = 100 * wp + 300 * wn + 330 * wb + 500 * wr + 900 * wq
-    return [whiteMaterial, blackMaterial]
+const makeMove = (pieceToMove, bestMove) => {
+
+    let actualBoard = getActualBoard()
+
+    if (pieceToMove.parentElement.getAttribute('data-type').toUpperCase() === 'P' || actualBoard[bestMove[0]][bestMove[1]] !== ' ') {
+        halfClock = 0
+    }
+    else halfClock++
+
+    const pieceToMovePos = [Number(pieceToMove.parentElement.getAttribute('data-row')), Number(pieceToMove.parentElement.getAttribute('data-col'))]
+    const dataArray = chessAI.makeMove(bestMove, pieceToMovePos, actualBoard, isDoubleMovePawn, blacksCanCastleRight, blacksCanCastleLeft)
+
+    const materialLeft = getMaterialInBoard()
+    if (materialLeft[0] < 1400 && materialLeft[1] < 1400) {
+        isEndGame = true
+    }
+
+    const lastAICell = dataArray[0]
+    const nextMoveAICell = dataArray[1]
+    lastPieceMovedByOpponent = dataArray[2]
+
+    isDoubleMovePawn = dataArray[3]
+
+    blacksCanCastleRight = dataArray[4]
+    blacksCanCastleLeft = dataArray[5]
+
+    checkIfPromotion(nextMoveAICell, lastAICell)
+    checkIfPawnCaptureEnPassant(nextMoveAICell)
+
+    actualBoard = getActualBoard()
+    const possibleWhiteMoves = getOneSidePossibleMoves('white', actualBoard, true)
+    if (possibleWhiteMoves.length === 0) {
+        showCheckMessage()
+        return
+    }
+}
+
+const changeTurn = () => {
+    let actualBoard = getActualBoard()
+
+    turn = turn === 'white' ? 'black' : 'white'
+
+    actualFEN = createFEN()
+    isCheck = getCheck(actualBoard, 'white')
+    if (isCheck) checkSound.play()
+}
+
+const removeHighlightCells = () => {
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            const cell = document.getElementsByClassName('cell')[i * 8 + j]
+            cell.classList.remove('highlight')
+            cell.removeEventListener('click', handleSquareClick)
+        }
+    }
 }

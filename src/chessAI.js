@@ -1,5 +1,6 @@
 import { pieces } from './pieces.js'
-import { checkIfCastleAndPlaceRook, checkPossibleMoves, getOneSidePossibleMoves, checkIfCheck } from './index.js'
+import { checkIfCastleAndPlaceRook, getPossibleMoves } from './index.js'
+import { getCheck, getOneSidePossibleMoves } from './helpers'
 import movesound from './sounds/movesound.mp3'
 import checksound from './sounds/checksound.mp3'
 import capturesound from './sounds/capturesound.mp3'
@@ -126,7 +127,7 @@ export const chessAI = {
                     }
                 })
 
-                possibleMoves = checkPossibleMoves(row, col, board)
+                possibleMoves = getPossibleMoves(row, col, board)
 
                 let movesToRemove = []
                 for (let i = 0; i < possibleMoves.length; i++) {
@@ -135,7 +136,7 @@ export const chessAI = {
                     const piecePos = [Number(row), Number(col)]
                     boardToCheck[nextMove[0]][nextMove[1]] = boardToCheck[piecePos[0]][piecePos[1]]
                     boardToCheck[piecePos[0]][piecePos[1]] = ' '
-                    if(checkIfCheck(nextMove, boardToCheck, 'black')) {
+                    if(getCheck(boardToCheck, 'black')) {
                         movesToRemove.push(nextMove)
                     }
                 }
