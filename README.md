@@ -6,3 +6,4 @@ La IA en Fácil está desarrollada por mí mismo y sin el uso de algoritmos, se 
 Puedes probarla en https://javiparmu.github.io/Chesster/
 
 
+![alt 1](https://res.cloudinary.com/journal-udemy-app/image/upload/c_scale,w_350/v1662469851/Chesster/xefayorvvdiuo8tmqrcc.jpg)
